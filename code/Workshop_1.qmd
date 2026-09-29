@@ -193,7 +193,7 @@ mass_compare_plot <- penguins %>%
        x = "Species") +
   theme_minimal()
 
-mass_compare_plot
+mass_compare_plot 
 
 
 ```
