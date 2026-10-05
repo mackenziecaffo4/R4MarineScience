@@ -441,15 +441,121 @@ head(penguins_clean)
 ## 2.12 Keystone Exercise 
 
 ```{r}
+estuary_catch_1 <- readxl::read_xlsx("../data/workshop2/estuary_catch_log.xlsx", sheet = "Lower_ross")
 
+estuary_catch_2 <- readxl::read_xlsx("../data/workshop2/estuary_catch_log.xlsx", sheet = "Mid_Ross ")
+
+estuary_catch_3 <- readxl::read_xlsx("../data/workshop2/estuary_catch_log.xlsx", sheet = "ROSS MOUTH")
+
+estuary_catch_4 <- readxl::read_xlsx("../data/workshop2/estuary_catch_log.xlsx", sheet = "Upper Ross")
+
+
+estuary_metadata <- read_csv("../data/workshop2/estuary_metadata.csv")
+
+estuary_sonde <- read_csv("../data/workshop2/estuary_sonde_data.csv")
+
+species_dictionary <- read_csv("../data/workshop2/species_dictionary.csv")
+```
+
+```{r}
+# clean the estuary_catch dataset first 
+# Step 1: combine all the estuary_catch datasets together 
+estuary_catch_compiled <- bind_rows(estuary_catch_1, estuary_catch_2, estuary_catch_3, estuary_catch_4)
+
+# mutate my variable names, so they are consistent with the whole dataset 
+estuary_catch_compiled <- estuary_catch_compiled %>%
+  mutate(
+    site = site |>
+      str_trim() |>
+      str_to_lower() |>
+      str_replace_all(" ", "_"),
+    species = species |>
+      str_trim() |> # gets rid of white spaces 
+      str_to_lower() |> # turns everything lowercase 
+      str_replace_all(" ", "_"), # replaces the spaces with underscores
+    date = as_date(date) # ensures that they are in the date format 
+  )
+```
+
+```{r}
+# clean the estuary_metadata dataset
+estuary_metadata <- estuary_metadata %>%  
+  mutate(
+    site_name = site_name |>
+      str_trim() |>            # trims leading/trailing spaces and collapses double spaces
+      str_to_lower() |>          # "Lower_ross" -> "lower_ross"
+      str_replace_all(" ", "_")  # "lower ross" -> "lower_ross" (in case any use spaces)
+  ) %>%  
+  rename(site = site_name)
+```
+
+```{r}
+# clean the species dictonary dataset 
+dictionary_clean <- species_dictionary %>% 
+  mutate(
+    common_name = common_name |>
+      str_trim() |> # removes any whitespace 
+      str_to_lower() |>
+      str_replace_all(" ", "_") 
+  )
+```
+
+```{r}
+# clean the sonde dataset 
+sonde_daily <- estuary_sonde |>
+  mutate(
+    site      = site |> 
+      str_squish() |> 
+      str_to_lower() |> 
+      str_replace_all(" ", "_"),
+    timestamp = dmy_hm(timestamp),
+    date      = as_date(timestamp)
+  ) |>
+  group_by(site, date) |>
+  summarise(
+    mean_temperature = mean(temperature, na.rm = TRUE),
+    mean_salinity    = mean(salinity,    na.rm = TRUE),
+    mean_turbidity   = mean(turbidity,   na.rm = TRUE),
+    .groups = "drop"
+  )
+```
+
+```{r}
+# merge/left_join all datasets together 
+estuary_master <- estuary_catch_compiled |>
+  left_join(estuary_metadata,   by = "site") |>
+  left_join(dictionary_clean, by = join_by(species == common_name)) |>
+  left_join(sonde_daily,      by = c("site", "date"))
 ```
 
 
+```{r}
+# confirming if my datasets combined correctly 
+nrow(estuary_catch_compiled)
+nrow(estuary_master)
+
+sum(is.na(estuary_master$zone))
+sum(is.na(estuary_master$scientific_name))
+sum(is.na(estuary_master$mean_temperature))
+
+sum(is.na(dmy_hm(estuary_sonde$timestamp)))
+```
+
+```{r}
+# Make a publication-ready visualization of the estuary's ecology, using the master dataset.Include something about the families of fish. I dont really want anything to do with salinity or temperature 
+ggplot(estuary_master, aes(x = date, y = count, color = species)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~ site) +
+  labs(
+    title = "Fish Counts Over Time by Family",
+    x = "Date",
+    y = "Count",
+    color = "Family"
+  ) +
+  theme_minimal()
 
 
-
-
-
-
+```
 
 
